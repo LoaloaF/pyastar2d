@@ -4,7 +4,6 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
 #include <iostream>
-#include <experimental_heuristics.h>
 
 
 const float INF = std::numeric_limits<float>::infinity();
@@ -38,27 +37,27 @@ inline float l1_norm(int i0, int j0, int i1, int j1) {
 }
 
 
-// weights:        flattened h x w grid of costs
-// h, w:           height and width of grid
-// start, goal:    index of start/goal in flattened grid
-// diag_ok:        if true, allows diagonal moves (8-conn.)
-// paths (output): for each node, stores previous node in path
+// weights:         flattened h x w grid of costs
+// h, w:            height and width of grid
+// start, goal:     index of start/goal in flattened grid
+// diag_ok:         if true, allows diagonal moves (8-conn.)
+// max_path_length: max path length to search
+// paths (output):  for each node, stores previous node in path
 static PyObject *astar(PyObject *self, PyObject *args) {
   const PyArrayObject* weights_object;
   int h;
   int w;
   int start;
   int goal;
-  int diag_ok;
-  int heuristic_override;
+  int max_path_length;
+  int diag_ok = false;
 
   if (!PyArg_ParseTuple(
-        args, "Oiiiiii", // i = int, O = object
+        args, "Oiiiii", // i = int, O = object
         &weights_object,
         &h, &w,
         &start, &goal,
-        &diag_ok, &heuristic_override
-        ))
+        &max_path_length))
     return NULL;
 
   float* weights = (float*) weights_object->data;
@@ -76,17 +75,26 @@ static PyObject *astar(PyObject *self, PyObject *args) {
   nodes_to_visit.push(start_node);
 
   int* nbrs = new int[8];
-  
-  int goal_i = goal / w;
-  int goal_j = goal % w;
-  int start_i = start / w;
-  int start_j = start % w;
-
-  heuristic_ptr heuristic_func = select_heuristic(heuristic_override);
 
   while (!nodes_to_visit.empty()) {
     // .top() doesn't actually remove the node
     Node cur = nodes_to_visit.top();
+
+
+
+
+    // std::cout << "Path length: ";
+    // std::cout << max_path_length;
+    if (cur.path_length > max_path_length) {
+      // std::cout << "Too long!!";
+      // path_length = cur.path_length;
+      break;
+    }
+    // std::cout << "...";
+
+
+
+
 
     if (cur.idx == goal) {
       path_length = cur.path_length;
@@ -114,16 +122,13 @@ static PyObject *astar(PyObject *self, PyObject *args) {
         float new_cost = costs[cur.idx] + weights[nbrs[i]];
         if (new_cost < costs[nbrs[i]]) {
           // estimate the cost to the goal based on legal moves
-          // Get the heuristic method to use
-          if (heuristic_override == DEFAULT) {
-            if (diag_ok) {
-              heuristic_cost = linf_norm(nbrs[i] / w, nbrs[i] % w, goal_i, goal_j);
-            } else {
-              heuristic_cost = l1_norm(nbrs[i] / w, nbrs[i] % w, goal_i, goal_j);
-            }
-          } else {
-            heuristic_cost = heuristic_func(
-              nbrs[i] / w, nbrs[i] % w, goal_i, goal_j, start_i, start_j);
+          if (diag_ok) {
+            heuristic_cost = linf_norm(nbrs[i] / w, nbrs[i] % w,
+                                       goal    / w, goal    % w);
+          }
+          else {
+            heuristic_cost = l1_norm(nbrs[i] / w, nbrs[i] % w,
+                                     goal    / w, goal    % w);
           }
 
           // paths with lower expected cost are explored first

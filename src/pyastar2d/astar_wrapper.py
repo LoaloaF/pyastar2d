@@ -1,7 +1,6 @@
 import ctypes
 import numpy as np
 import pyastar2d.astar
-from enum import IntEnum
 from typing import Optional, Tuple
 
 
@@ -20,32 +19,15 @@ pyastar2d.astar.argtypes = [
     ctypes.c_int,   # start index in flattened grid
     ctypes.c_int,   # goal index in flattened grid
     ctypes.c_bool,  # allow diagonal
-    ctypes.c_int,   # heuristic_override
 ]
 
-class Heuristic(IntEnum):
-    """The supported heuristics."""
-
-    DEFAULT = 0
-    ORTHOGONAL_X = 1
-    ORTHOGONAL_Y = 2
 
 def astar_path(
         weights: np.ndarray,
         start: Tuple[int, int],
         goal: Tuple[int, int],
-        allow_diagonal: bool = False,
-        heuristic_override: Heuristic = Heuristic.DEFAULT) -> Optional[np.ndarray]:
-    """
-    Run astar algorithm on 2d weights.
-
-    param np.ndarray weights: A grid of weights e.g. np.ones((10, 10), dtype=np.float32)
-    param Tuple[int, int] start: (i, j)
-    param Tuple[int, int] goal: (i, j)
-    param bool allow_diagonal: Whether to allow diagonal moves
-    param Heuristic heuristic_override: Override heuristic, see Heuristic(IntEnum)
-
-    """
+        max_path_length: int = 10000,
+        allow_diagonal: bool = False) -> Optional[np.ndarray]:
     assert weights.dtype == np.float32, (
         f"weights must have np.float32 data type, but has {weights.dtype}"
     )
@@ -67,7 +49,6 @@ def astar_path(
     goal_idx = np.ravel_multi_index(goal, (height, width))
 
     path = pyastar2d.astar.astar(
-        weights.flatten(), height, width, start_idx, goal_idx, allow_diagonal,
-        int(heuristic_override)
+        weights.flatten(), height, width, start_idx, goal_idx, max_path_length
     )
     return path
